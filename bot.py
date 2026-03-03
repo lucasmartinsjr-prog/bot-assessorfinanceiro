@@ -18,6 +18,9 @@ Exemplos:
 """
 
 import logging
+import os
+import json
+import tempfile
 from datetime import datetime
 from telegram import Update
 from telegram.ext import (
@@ -28,19 +31,20 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # ============================================================
-# CONFIGURACOES — edite estas 3 linhas
+# CONFIGURACOES
 # ============================================================
-TELEGRAM_TOKEN   = "8722885193:AAGJ2gPQupJkkDR3_vJUgHC_X8y_98ssUwE"           # Token do @BotFather
-SPREADSHEET_ID   = "1DrehDy6YY7CwBWeeXgOXboSLwxeHYvrSM39W5klF1iA"  # ID do Google Sheets
-CREDENTIALS_FILE = "credentials.json"          # Arquivo de credenciais
+TELEGRAM_TOKEN   = "8722885193:AAE086jGxotiF8eUwFNj4VPb4rSrpZdcPD4"
+SPREADSHEET_ID   = "1DrehDy6YY7CwBWeeXgOXboSLwxeHYvrSM39W5klF1iA"
+CREDENTIALS_FILE = "credentials.json"
 # ============================================================
 
-# Categorias validas (devem bater EXATAMENTE com a planilha)
 CATS_DESPESA = {
     "despesa fixa"  : "Despesa Fixa",
     "saude"         : "Saúde",
+    "saúde"         : "Saúde",
     "equipe"        : "Equipe",
     "cartao"        : "Cartão",
+    "cartão"        : "Cartão",
     "contrato"      : "Contrato",
     "outros"        : "Outros",
 }
@@ -51,10 +55,9 @@ CATS_RECEITA = {
     "outros"        : "Outros",
 }
 
-# Nomes exatos das abas no Google Sheets
-ABA_RECEITAS  = "Receitas"
-ABA_DESPESAS  = "Despesas"
-ABA_DASHBOARD = "Dashboard"
+ABA_RECEITAS  = "📥 Receitas"
+ABA_DESPESAS  = "📤 Despesas"
+ABA_DASHBOARD = "📊 Dashboard"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 log = logging.getLogger(__name__)
@@ -65,23 +68,29 @@ def conectar():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
-    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+
+    # Tenta ler credenciais da variavel de ambiente (Railway)
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS")
+    if creds_json:
+        creds_dict = json.loads(creds_json)
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+    else:
+        # Fallback: le do arquivo local
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=scopes)
+
     return gspread.authorize(creds).open_by_key(SPREADSHEET_ID)
 
 def proxima_linha(sheet):
-    col = sheet.col_values(2)  # coluna B = Data
+    col = sheet.col_values(2)
     for i in range(5, len(col)):
         if not col[i]:
             return i + 1
     return max(len(col) + 1, 6)
 
 def normalizar_categoria(texto, mapa):
-    """Tenta encontrar a categoria correta mesmo com acentos/maiusculas errados."""
     t = texto.lower().strip()
-    # busca exata
     if t in mapa:
         return mapa[t]
-    # busca parcial
     for key, val in mapa.items():
         if t in key or key in t:
             return val
@@ -115,9 +124,9 @@ def buscar_resumo_mes():
     doc   = conectar()
     sheet = doc.worksheet(ABA_DASHBOARD)
     mes   = datetime.now().month
-    linha = 10 + mes  # linha 11 = Jan, 22 = Dez
-    rec  = float(str(sheet.cell(linha, 10).value or "0").replace(",", "."))
-    desp = float(str(sheet.cell(linha, 11).value or "0").replace(",", "."))
+    linha = 10 + mes
+    rec   = float(str(sheet.cell(linha, 10).value or "0").replace(",", "."))
+    desp  = float(str(sheet.cell(linha, 11).value or "0").replace(",", "."))
     saldo = rec - desp
     return rec, desp, saldo
 
@@ -131,15 +140,15 @@ AJUDA = (
     "  receita 18000 Pref Cafelandia Freela\n"
     "  resumo\n"
     "  categorias\n\n"
-    "Dica: o valor usa ponto como decimal. Ex: 834.14"
+    "Dica: use ponto como decimal. Ex: 834.14"
 )
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(AJUDA)
 
 async def cmd_categorias(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    d = ", ".join(CATS_DESPESA.values())
-    r = ", ".join(CATS_RECEITA.values())
+    d = ", ".join(dict.fromkeys(CATS_DESPESA.values()))
+    r = ", ".join(dict.fromkeys(CATS_RECEITA.values()))
     await update.message.reply_text(
         f"Categorias de despesa:\n{d}\n\nCategorias de receita:\n{r}"
     )
@@ -148,15 +157,15 @@ async def cmd_resumo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         await update.message.reply_text("Buscando dados da planilha...")
         rec, desp, saldo = buscar_resumo_mes()
-        mes  = datetime.now().strftime("%B de %Y")
-        icone = "positivo" if saldo >= 0 else "NEGATIVO - atencao!"
+        mes   = datetime.now().strftime("%m/%Y")
+        icone = "OK" if saldo >= 0 else "ATENCAO - saldo negativo!"
         await update.message.reply_text(
             f"Resumo de {mes}\n"
             f"----------------------------\n"
             f"Receitas:  R$ {rec:>10,.2f}\n"
             f"Despesas:  R$ {desp:>10,.2f}\n"
             f"----------------------------\n"
-            f"Saldo:     R$ {saldo:>10,.2f}  ({icone})"
+            f"Saldo [{icone}]: R$ {saldo:>10,.2f}"
         )
     except Exception as e:
         log.error(e)
@@ -167,13 +176,12 @@ async def cmd_resumo(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def processar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     texto  = update.message.text.strip()
     partes = texto.split(None, 3)
-
     primeiro = partes[0].lower() if partes else ""
 
-    if primeiro in ("resumo",):
+    if primeiro == "resumo":
         await cmd_resumo(update, ctx)
         return
-    if primeiro in ("categorias",):
+    if primeiro == "categorias":
         await cmd_categorias(update, ctx)
         return
     if primeiro in ("ajuda", "help"):
@@ -231,7 +239,7 @@ async def processar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         log.error(e)
         await update.message.reply_text(
             "Erro ao salvar na planilha.\n"
-            "Verifique se as configuracoes estao corretas (token, ID da planilha, credentials.json)."
+            "Verifique se a planilha esta compartilhada com a conta de servico."
         )
 
 # ── Main ─────────────────────────────────────────────────────
