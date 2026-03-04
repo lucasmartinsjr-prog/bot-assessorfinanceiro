@@ -34,7 +34,7 @@ from google.oauth2.service_account import Credentials
 # CONFIGURACOES
 # ============================================================
 TELEGRAM_TOKEN   = "8722885193:AAE086jGxotiF8eUwFNj4VPb4rSrpZdcPD4"
-SPREADSHEET_ID   = "1DrehDy6YY7CwBWeeXgOXboSLwxeHYvrSM39W5klF1iA"
+SPREADSHEET_ID   = "1tTCTvPXCPYTLZrt4c31xsTV_qrf_8h10iISZgD8uN4s"
 CREDENTIALS_FILE = "credentials.json"
 # ============================================================
 
