@@ -238,8 +238,7 @@ async def processar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.error(e)
         await update.message.reply_text(
-            "Erro ao salvar na planilha.\n"
-            "Verifique se a planilha esta compartilhada com a conta de servico."
+            f"Erro: {str(e)}"
         )
 
 # ── Main ─────────────────────────────────────────────────────
