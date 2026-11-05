@@ -33,9 +33,13 @@ from google.oauth2.service_account import Credentials
 # ============================================================
 # CONFIGURACOES
 # ============================================================
-TELEGRAM_TOKEN   = "8722885193:AAE086jGxotiF8eUwFNj4VPb4rSrpZdcPD4"
-SPREADSHEET_ID   = "1tTCTvPXCPYTLZrt4c31xsTV_qrf_8h10iISZgD8uN4s"
-CREDENTIALS_FILE = "credentials.json"
+# Segredos vem de variaveis de ambiente (configure no Railway).
+# NUNCA coloque tokens ou chaves direto no codigo: o repositorio e publico.
+TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN")
+SPREADSHEET_ID   = os.environ.get(
+    "SPREADSHEET_ID", "1tTCTvPXCPYTLZrt4c31xsTV_qrf_8h10iISZgD8uN4s"
+)
+CREDENTIALS_FILE = "credentials.json"  # so para rodar localmente (fica no .gitignore)
 # ============================================================
 
 CATS_DESPESA = {
@@ -243,7 +247,9 @@ async def processar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── Main ─────────────────────────────────────────────────────
 def main():
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    if not TELEGRAM_TOKEN:
+        raise SystemExit("Defina a variavel de ambiente TELEGRAM_TOKEN.")
+    app =ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(CommandHandler("start",      cmd_start))
     app.add_handler(CommandHandler("ajuda",      cmd_start))
     app.add_handler(CommandHandler("resumo",     cmd_resumo))
