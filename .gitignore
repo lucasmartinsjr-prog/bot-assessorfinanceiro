@@ -1,0 +1,11 @@
+# Credenciais e segredos - nunca versionar
+credentials*.json
+*.json.json
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
